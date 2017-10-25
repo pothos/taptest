@@ -1,0 +1,9 @@
+[package]
+name = "taptest"
+version = "0.1.0"
+authors = ["Kai Lüke <kailueke@riseup.net>"]
+
+[dependencies]
+smoltcp = { git = "https://github.com/m-labs/smoltcp.git" }
+env_logger = "*"
+
