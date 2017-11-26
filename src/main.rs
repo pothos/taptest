@@ -1,6 +1,7 @@
 extern crate smoltcp;
 extern crate env_logger;
 
+use std::collections::BTreeMap;
 use std::thread;
 use std::io::{self, Write};
 use std::time::Instant;
@@ -10,7 +11,7 @@ use std::os::unix::io::AsRawFd;
 use smoltcp::phy::wait as phy_wait;
 use smoltcp::phy::TapInterface;
 use smoltcp::wire::{EthernetAddress, IpAddress, IpCidr};
-use smoltcp::iface::{ArpCache, SliceArpCache, EthernetInterface};
+use smoltcp::iface::{NeighborCache, EthernetInterface};
 use smoltcp::socket::{TcpSocket, TcpSocketBuffer, SocketSet};
 
 /*
@@ -58,7 +59,7 @@ pub fn smoltcpserver() {
     let device = TapInterface::new("tap0").unwrap();
     let fd = device.as_raw_fd();
     let startup_time = Instant::now();
-    let arp_cache = SliceArpCache::new(vec![Default::default(); 8]);
+    let neighbor_cache = NeighborCache::new(BTreeMap::new());
     let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 65535]);
     let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 65535]);
     let tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
@@ -71,8 +72,8 @@ pub fn smoltcpserver() {
     */
 
     let mut iface = EthernetInterface::new(
-        Box::new(device),
-        Box::new(arp_cache) as Box<ArpCache>,
+        device,
+        neighbor_cache,
         ethernet_addr,
         ip_addrs,
         None,
