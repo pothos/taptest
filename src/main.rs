@@ -4,14 +4,14 @@ extern crate env_logger;
 use std::collections::BTreeMap;
 use std::thread;
 use std::io::{self, Write};
-use std::time::Instant;
+use std::time::{Instant, Duration};
 use std::io::prelude::*;
 use std::net::{TcpStream};
 use std::os::unix::io::AsRawFd;
 use smoltcp::phy::wait as phy_wait;
 use smoltcp::phy::TapInterface;
 use smoltcp::wire::{EthernetAddress, IpAddress, IpCidr};
-use smoltcp::iface::{NeighborCache, EthernetInterface};
+use smoltcp::iface::{NeighborCache, EthernetInterfaceBuilder};
 use smoltcp::socket::{TcpSocket, TcpSocketBuffer, SocketSet};
 
 /*
@@ -25,6 +25,7 @@ use std::fs::File;
 const AMOUNT: u64 = 10000000;
 
 pub fn client() {
+    thread::sleep(Duration::from_millis(199));
     let mut stream = TcpStream::connect("192.168.69.1:8080").unwrap();
     let mut inp = vec![0; 64];
     let mut read: u64 = 0;
@@ -71,13 +72,11 @@ pub fn smoltcpserver() {
     let device = PcapWriter::new(device, Rc::new(RefCell::new(pcap_writer)) as Rc<PcapSink>, PcapMode::Both, PcapLinkType::Ethernet );
     */
 
-    let mut iface = EthernetInterface::new(
-        device,
-        neighbor_cache,
-        ethernet_addr,
-        ip_addrs,
-        None,
-    );
+    let mut iface = EthernetInterfaceBuilder::new(device)
+            .ethernet_addr(ethernet_addr)
+            .neighbor_cache(neighbor_cache)
+            .ip_addrs(ip_addrs)
+            .finalize();
 
     let mut sockets = SocketSet::new(vec![]);
     let tcp_handle = sockets.add(tcp_socket);
@@ -87,6 +86,8 @@ pub fn smoltcpserver() {
     let mut outp = vec![0; 64];
 
     loop {
+        let timestamp = millis_since(startup_time);
+        iface.poll(&mut sockets, timestamp).expect("poll error");
 
         {
             let mut socket = sockets.get::<TcpSocket>(tcp_handle);
@@ -133,9 +134,7 @@ pub fn smoltcpserver() {
             }
         }
 
-        let timestamp = millis_since(startup_time);
-        let poll_at = iface.poll(&mut sockets, timestamp).expect("poll error");
-        phy_wait(fd, poll_at.map(|at| at.saturating_sub(timestamp))).expect("wait error");
+        phy_wait(fd, iface.poll_delay(&sockets, timestamp)).expect("wait error");
 
     }
 }
